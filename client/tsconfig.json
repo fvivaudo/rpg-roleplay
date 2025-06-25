@@ -1,11 +1,35 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
+  "compilerOptions": {
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"],
+//      "@backend/*": ["../server/*"]
     },
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ]
+    // Enable latest features
+    "lib": [
+      "ESNext",
+      "dom"
+    ],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+
+    // Bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+//    "verbatimModuleSyntax": true,
+    "declaration": false,                              /* Generate .d.ts files from TypeScript and JavaScript files in your project. */
+
+    // Best practices
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Some stricter flags
+//    "noUnusedLocals": true,
+//    "noUnusedParameters": true,
+//    "noPropertyAccessFromIndexSignature": true
+  }
 }

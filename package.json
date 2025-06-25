@@ -1,7 +1,5 @@
 {
-  "name": "nekron",
-  "workspaces": ["client", "server"],
-  "devDependencies": {
-  },
-  "trustedDependencies": [""]
+  "name": "rpg",
+  "trustedDependencies": ["", "@parcel/watcher", "@prisma/client", "@prisma/engines", "@swc/core", "esbuild", "prisma"],
+  "workspaces": ["client", "server"]
 }
