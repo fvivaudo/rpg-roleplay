@@ -1,15 +1,22 @@
 {
-  "name": "@nekron/server",
+  "name": "@rpg/server",
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "prisma:push": "bunx prisma db push"
   },
   "dependencies": {
-    "elysia": "^1.1.4"
+    "@elysiajs/cors": "^1.2.0",
+    "@elysiajs/jwt": "^1.2.0",
+    "@elysiajs/swagger": "^1.2.0",
+    "@prisma/client": "^5.22.0",
+    "elysia": "^1.2.10"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "@types/bun": "^1.1.15",
+    "bun-types": "latest",
+    "prisma": "^5.22.0"
   },
   "module": "src/index.js"
 }
