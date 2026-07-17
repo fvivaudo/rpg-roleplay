@@ -1,8 +1,8 @@
 import jwt from "@elysiajs/jwt";
 import Elysia from "elysia";
+import { eq } from "drizzle-orm";
 import { JWT_NAME } from "./config/constants";
-import { prisma } from "./lib";
-import cors from "@elysiajs/cors";
+import { db, schema } from "./lib";
 
 const authPlugin = (app: Elysia) =>
     app
@@ -32,12 +32,12 @@ const authPlugin = (app: Elysia) =>
                 // throw new Error("Access token is invalid");
             }
 
-            const userId = jwtPayload.sub;
-            const user = await prisma.user.findUnique({
-                where: {
-                    id: userId,
-                },
-            });
+            const userId = jwtPayload.sub as string;
+            const [user] = await db
+                .select()
+                .from(schema.users)
+                .where(eq(schema.users.id, userId))
+                .limit(1);
 
             if (!user) {
                 // handle error for user not found from the provided access token

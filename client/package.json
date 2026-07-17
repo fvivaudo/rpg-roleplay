@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@elysiajs/eden": "^1.2.0",
+    "@rpg/protocol": "workspace:*",
+    "@rpg/world": "workspace:*",
     "@hookform/resolvers": "^3.10.0",
     "@phosphor-icons/react": "^2.1.7",
     "@radix-ui/react-dialog": "^1.1.4",
@@ -42,9 +44,7 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
-    "@types/dompurify": "^3.2.0",
     "@types/js-cookie": "^3.0.6",
-    "@types/marked": "^6.0.0",
     "@types/node": "^20.17.12",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

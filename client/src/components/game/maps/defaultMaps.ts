@@ -1,4 +1,4 @@
-import { MapData } from '../../../../../../project/src/types';
+import { MapData } from './types';
 
 export const defaultMaps = {
   exterior: {

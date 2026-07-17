@@ -1,227 +1,201 @@
-import {Link, useNavigate, useSearchParams} from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Navigate } from 'react-router';
 
-import {ArrowsOutCardinal} from "@phosphor-icons/react";
-import interact from 'interactjs'
+import { ATTRIBUTE_KEYS, getRace, type AttributeKey } from '@rpg/protocol';
+import { applyRacialMods, deriveStats } from '@rpg/world';
 
-import logo from '@/assets/react.svg';
-import {Head} from '@/components/seo';
-import {Button} from '@/components/ui/button';
-import {useLogout, useUser} from '@/lib/auth.tsx';
+import { GameRenderer } from '@/components/game/GameRenderer';
+import { Head } from '@/components/seo';
+import { gameApi, getActiveCharacterId } from '@/lib/game-api';
+import { cn } from '@/utils/cn';
 
-import {Layout} from '@/components/layouts/auth-layout.tsx';
-import {LoginForm} from '@/features/auth/components/login-form.tsx';
-import {RegisterForm} from "@/features/auth/components/register-form.tsx";
-import {ReactNode, useCallback, useEffect, useState} from "react";
-import {Message, UserData} from "@/lib/api-client";
-import {useChat} from "@/hooks/use-chat";
-import * as ex from 'excalibur';
-
-
-type WindowWrapperProps = {
-    children?: ReactNode
-    objectId: string
-    className?: string
-}
-const WindowWrapper = ({children, objectId, className}: WindowWrapperProps) => {
-    const position = {x: 0, y: 0}
-
-    interact('#' + objectId)
-        .draggable({
-            allowFrom: '.drag-handle',
-            listeners: {
-                start(event) {
-                    // console.log(event.type, event.target)
-                },
-                move(event) {
-                    position.x += event.dx
-                    position.y += event.dy
-
-                    event.target.style.transform =
-                        `translate(${position.x}px, ${position.y}px)`
-                },
-            }
-        })
-        .resizable({
-            // resize from bottom and right border
-            edges: {bottom: true, right: true},
-
-            listeners: {
-                move: function (event) {
-                    let {x, y} = event.target.dataset
-
-                    x = (parseFloat(x) || 0) + event.deltaRect.left
-                    y = (parseFloat(y) || 0) + event.deltaRect.top
-
-                    Object.assign(event.target.style, {
-                        width: `${event.rect.width}px`,
-                        height: `${event.rect.height}px`,
-                        // transform: `translate(${x}px, ${y}px)`
-                    })
-
-                    Object.assign(event.target.dataset, {x, y})
-                }
-            },
-            modifiers: [
-                // keep the edges inside the parent
-                interact.modifiers.restrictEdges({
-                    outer: 'parent'
-                }),
-
-                // minimum size
-                interact.modifiers.restrictSize({
-                    min: {width: 100, height: 50}
-                })
-            ],
-
-            inertia: true
-        })
-    return (
-        <div
-            id={objectId}
-            className={`${className} absolute window-default `}
-        >
-            {children}
-        </div>
-    )
-}
-
-const ChatWindow = ({history, userId, characterId, characterName}: {
-    history: Message[],
-    userId: string,
-    characterId: string,
-    characterName: string
-}) => {
-    const [inputMessage, setInputMessage] = useState("");
-
-    const {messages, sendMessage} = useChat(history, userId, characterId, characterName);
-
-    console.log("Render")
-
-    const handleInput = useCallback((e) => {
-        setInputMessage(e.target.value);
-    }, []);
-
-    const handleSend = useCallback(
-        (e) => {
-            if (inputMessage.length) {
-                sendMessage(inputMessage);
-                setInputMessage("");
-            }
-        },
-        [sendMessage, inputMessage]
-    );
-
-    const handleKeypress = e => {
-        //it triggers by pressing the enter key
-        if (inputMessage.length && e.keyCode === 13) {
-            handleSend(e);
-        }
-    };
-
-    return (
-        // <div className="draggable window-default relative w-96 h-96 text-white flex flex-col">
-        //     <div className="resize-drag absolute window-default w-96 h-96 text-white flex flex-col">
-        <>
-            <div className="drag-handle absolute h-6 w-6 top-2 right-4 text-center">
-                <ArrowsOutCardinal size={32} color="#3B82F6C2"/>
-            </div>
-            <div className="overflow-y-scroll  h-full flex flex-col flex-grow no-scrollbar break-words">
-                {messages
-                    ? messages.map(({id, characterName, content}) => (
-                        <div key={id} className="px-2">
-                            <span>{characterName} : {content}</span>
-                        </div>
-                    ))
-                    : "Loading..."}
-            </div>
-            <input className="window-default h-12 text-white w-full flex"
-                   placeholder="type your message here..."
-                   value={inputMessage}
-                   onChange={handleInput}
-                   onKeyDown={handleKeypress}>
-            </input>
-            {/*<button onClick={handleSend}>send</button>*/}
-
-            {/*<div className="resize-handle absolute bottom-0 h-6 w-6 -right-6 window-default">*/}
-            {/*    r*/}
-            {/*</div>*/}
-        </>
-    )
-}
-
-
-// const game = new ex.Engine({
-//     width: 400,
-//     height: 500,
-//     backgroundColor: ex.Color.fromHex("#54C0CA"),
-//     pixelArt: true,
-//     pixelRatio: 2,
-//     displayMode: ex.DisplayMode.FitScreen
-// });
-//
-// game.start();
-// TODO declare gameCanvas component to wrap game into
-// const game = new ex.Engine({
-//     width: 0, // the width of the canvas
-//     height: 0, // the height of the canvas
-//     enableCanvasTransparency: true, // the transparencySection of the canvas
-//     canvasElementId: 'game', // the DOM canvas element ID, if you are providing your own
-//     // displayMode: ex.DisplayMode.FillScreen, // the display mode
-//     // pointerScope: ex.PointerScope.Document, // the scope of capturing pointer (mouse/touch) events
-//     backgroundColor: ex.Color.fromHex('#2185d0') // background color of the engine
-// });
-//
-// game.start();
+const ATTRIBUTE_LABELS: Record<AttributeKey, string> = {
+  body: 'Body',
+  agility: 'Agility',
+  perception: 'Perception',
+  logic: 'Logic',
+};
 
 export const GameRoute = () => {
-    const navigate = useNavigate();
-    const user = useUser();
-    const logout = useLogout();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-    // TODO store entire ux state and restore it from user db
-    const [UxElements, setUxElements] = useState([])
+  const characters = useQuery({
+    queryKey: ['characters'],
+    queryFn: gameApi.listCharacters,
+  });
 
-    const [searchParams] = useSearchParams();
-    const redirectTo = searchParams.get('redirectTo');
+  const maps = useQuery({ queryKey: ['maps'], queryFn: gameApi.listMaps });
 
-    useEffect(() => {
-        if (!user.data) {
-            navigate('/');
-        }
-    }, [navigate, user]);
+  // V0: everyone plays on the first (seeded) map. Position persistence and
+  // multi-map travel arrive with Rooms in Phase 1.
+  const mapId = maps.data?.[0]?.id;
+  const map = useQuery({
+    queryKey: ['map', mapId],
+    queryFn: () => gameApi.getMap(mapId!),
+    enabled: !!mapId,
+  });
 
-    if (!user.data) {
-        return <div>Loading</div>
-    }
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === 'c' && !isTyping(event)) {
+        setSheetOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-    console.log(user.data)
-    // <Button disabled={logout.isLoading} onClick={() => logout.mutate({})}>
-    //     Log out
-    // </Button>
+  const activeId = getActiveCharacterId();
+  const character = useMemo(
+    () => characters.data?.find((c) => c.id === activeId) ?? null,
+    [characters.data, activeId],
+  );
 
+  // Only bounce once the list is settled: right after creation the cached
+  // (stale) list doesn't contain the new character yet while it refetches.
+  if (characters.isSuccess && !characters.isFetching && !character) {
+    return <Navigate to="/app/characters" replace />;
+  }
 
+  if (!character || !map.data) {
     return (
-        <>
-            <div className="relative w-full h-screen no-scrollbar">
-                <canvas id={'game'} width={800} height={600} />
-                <div
-                    className={"-z-40 absolute w-full h-full bg-cover bg-[url('/game/background.webp')] brightness-75"}/>
-                {/*{UxElements.map(item) => {*/}
-                {/*    <ChatWindow/>*/}
-                {/*    <ChatWindow/>*/}
-                {/*}}*/}
-                <WindowWrapper objectId={'chatBox1'} className={'w-96 h-96 text-white flex flex-col'}>
-                    {/*TODO Differentiate between user and characters*/}
-                    <ChatWindow
-                        history={user.data.gameChatHistory}
-                        userId={user.data.id}
-                        characterId={user.data.id}
-                        characterName={user.data.name}/>
-                </WindowWrapper>
-                {/*<WindowWrapper objectId={'chatBox2'} className={'w-96 h-96 text-white flex flex-col'}>*/}
-                {/*    <ChatWindow/>*/}
-                {/*</WindowWrapper>*/}
-            </div>
-        </>
+      <div className="flex h-full items-center justify-center text-sm uppercase tracking-[0.3em] text-slate-500">
+        {maps.isError || map.isError || characters.isError
+          ? 'Connection to the grid failed.'
+          : 'Loading the grid…'}
+      </div>
     );
+  }
+
+  const level = map.data.levels[0];
+  const race = getRace(character.raceId);
+  const effective = applyRacialMods(character.attributes, character.raceId);
+  const derived = deriveStats(effective);
+
+  return (
+    <>
+      <Head title="Game" />
+      <div className="relative h-full w-full overflow-hidden">
+        <GameRenderer level={level.data} sizeClass={character.sizeClass} />
+
+        {/* top status cluster */}
+        <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-3 border border-cyan-900/50 bg-[#0b0b14]/85 px-4 py-2">
+          <div>
+            <p className="text-sm font-bold text-cyan-300">{character.name}</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+              {race?.name} · {character.sizeClass} · Lv {character.level} ·{' '}
+              <span className="text-amber-400/90">{character.credits} ¢</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute right-4 top-4 border border-cyan-900/50 bg-[#0b0b14]/85 px-4 py-2 text-right">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+            {map.data.name}
+          </p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-600">
+            {level.name} · v{level.version}
+          </p>
+        </div>
+
+        {/* bottom hint bar */}
+        <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 border border-slate-800 bg-[#0b0b14]/85 px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] text-slate-500">
+          Click to move · C — character sheet
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setSheetOpen((open) => !open)}
+          className={cn(
+            'absolute bottom-4 right-4 border px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em]',
+            sheetOpen
+              ? 'border-cyan-500/70 bg-cyan-950/60 text-cyan-300'
+              : 'border-slate-700 bg-[#0b0b14]/85 text-slate-400 hover:text-slate-200',
+          )}
+        >
+          Sheet
+        </button>
+
+        {/* character sheet */}
+        {sheetOpen && (
+          <aside className="absolute right-4 top-20 w-72 border border-cyan-900/60 bg-[#0b0b14]/95 p-5 shadow-[0_0_40px_rgba(34,211,238,0.1)]">
+            <header className="mb-4 border-b border-slate-800 pb-3">
+              <h2 className="text-lg font-bold text-slate-100">
+                {character.name}
+              </h2>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                {race?.name} · {character.gender} · size {character.sizeClass}
+              </p>
+            </header>
+
+            <dl className="mb-4 space-y-2">
+              {ATTRIBUTE_KEYS.map((key) => (
+                <div key={key} className="flex items-center justify-between">
+                  <dt className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                    {ATTRIBUTE_LABELS[key]}
+                  </dt>
+                  <dd className="flex items-center gap-2">
+                    <span className="h-1.5 w-24 bg-slate-800">
+                      <span
+                        className="block h-full bg-cyan-500/70"
+                        style={{
+                          width: `${Math.min(100, (effective[key] / 7) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="w-5 text-right text-sm font-bold text-cyan-300">
+                      {effective[key]}
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="mb-4 grid grid-cols-2 gap-2 text-center">
+              <SheetStat label="HP" value={`${derived.maxHp}`} />
+              <SheetStat label="Initiative" value={`${derived.initiative}`} />
+              <SheetStat label="Carry" value={`${derived.carryCapacity}`} />
+              <SheetStat label="Move" value={`${derived.moveBudget}`} />
+            </div>
+
+            <div className="space-y-1 text-[11px] text-slate-500">
+              <p>
+                XP {character.xp} · Level {character.level}
+              </p>
+              <p className="text-amber-400/90">{character.credits} credits</p>
+              {character.bio && (
+                <p className="border-t border-slate-800 pt-2 italic text-slate-400">
+                  {character.bio}
+                </p>
+              )}
+              <p className="border-t border-slate-800 pt-2 text-slate-600">
+                Traits are private — yours will appear here once the trait pool
+                ships.
+              </p>
+            </div>
+          </aside>
+        )}
+      </div>
+    </>
+  );
 };
+
+const SheetStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="border border-slate-800 bg-black/40 py-2">
+    <p className="text-[10px] uppercase tracking-widest text-slate-500">
+      {label}
+    </p>
+    <p className="text-lg font-bold text-cyan-300">{value}</p>
+  </div>
+);
+
+function isTyping(event: KeyboardEvent): boolean {
+  const target = event.target as HTMLElement | null;
+  return (
+    !!target &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable)
+  );
+}

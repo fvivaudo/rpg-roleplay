@@ -1,11 +1,12 @@
 import Elysia, {t} from 'elysia'
 
-import {authRoutes} from "./routes";
+import {authRoutes, characterRoutes, mapRoutes, forumRoutes} from "./routes";
 import {swagger} from '@elysiajs/swagger'
 import cors from "@elysiajs/cors";
 import type {ElysiaWS} from "elysia/ws";
 import {authPlugin} from "./plugin.ts";
-import {prisma} from "./lib";
+import {db, schema} from "./lib";
+import {seed} from "./db/seed";
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
@@ -39,6 +40,9 @@ const app = new Elysia()
     )
     .use(new Elysia({prefix: "/api"}))
     .use(authRoutes)
+    .use(characterRoutes)
+    .use(mapRoutes)
+    .use(forumRoutes)
     .ws('/chat', {
         body: t.Object({
             // id: t.String(),
@@ -69,20 +73,18 @@ const app = new Elysia()
 
             // TODO fit in transaction
             usersIdInRange.forEach((userId) =>
-                prisma.chatMessage.create({
-                    data: {
+                db.insert(schema.chatMessages)
+                    .values({
                         characterName: message.characterName,
                         characterId: message.characterId,
                         content: message.content,
-                        user: {
-                            connect: {id: userId},
-                        },
-                    },
-                }).then((result) => {
-                    console.log('Operation successful:', result);
-                }).catch((error) => {
-                    console.error('Error occurred:', error);
-                })
+                        userId,
+                    })
+                    .then((result) => {
+                        console.log('Operation successful:', result);
+                    }).catch((error) => {
+                        console.error('Error occurred:', error);
+                    })
             )
         },
         open(ws) {
@@ -111,6 +113,10 @@ const app = new Elysia()
 console.log(
     `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
 );
+
+// Idempotent: seeds the default district map and forum categories when the
+// corresponding tables are empty.
+seed().catch((err) => console.error("Seed failed", err));
 
 
 // const app = new Elysia()

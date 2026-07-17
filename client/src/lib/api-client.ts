@@ -7,7 +7,7 @@ import  { Treaty } from "@elysiajs/eden";
 import {LoginInput, RegisterInput} from "@/lib/auth.tsx";
 // import Cookies from "js-cookie";
 // import  { EdenTreaty } from "@elysiajs/eden/dist/treaty";
-import {User, ChatMessage} from "@prisma/client";
+import type {User, ChatMessage} from "@rpg/protocol";
 
 export type UserData = User & {gameChatHistory: Omit<ChatMessage, "modifiedAt"|"characterId"|"userId">[]}
 export interface Message {
@@ -72,13 +72,25 @@ class api {
     }
 
     async login(loginInput:LoginInput) {
-        const { data, error } = await this.server.auth.login.post(loginInput);
+        const { data, error } = await this.server.auth.login.post({
+            ...loginInput,
+            // credentials:'include' is required for the browser to store the
+            // httpOnly cookie pair the server sets on the response.
+            $fetch: {
+                credentials: 'include',
+            },
+        });
         if (error) throw error;
         return data;
     }
 
     async signUp(registerInput:RegisterInput) {
-        const { data, error } = await this.server.auth.signup.post(registerInput);
+        const { data, error } = await this.server.auth.signup.post({
+            ...registerInput,
+            $fetch: {
+                credentials: 'include',
+            },
+        });
 
         if (error) throw error;
         return data;

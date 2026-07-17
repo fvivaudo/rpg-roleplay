@@ -2,7 +2,7 @@
 // ideally, we want to keep these api related types in sync
 // with the backend instead of manually writing them out
 
-import type { User } from '@prisma/client'
+import type { User } from '@rpg/protocol'
 
 
 export type BaseEntity = {
@@ -22,12 +22,11 @@ export type Entity<T> = {
 //   teamId: string;
 //   bio: string;
 // }>;
+// Tokens live in httpOnly cookies and never appear in response bodies.
 export type AuthResponse = {
   message: string,
   data: {
     user: User,
-    accessToken: string,
-    refreshToken: string,
   },
 };
 
