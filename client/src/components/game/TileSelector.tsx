@@ -1,13 +1,13 @@
 import React from 'react';
-import { TILES } from '../../../../../project/src/assets/tileset';
+import { TILES } from '@/components/game/assets/tileset';
 
 interface TileSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (type: 'floor' | 'wall', variant: number) => void;
+  onSelect: (type: 'floor' | 'wall', tileId: number) => void;
 }
 
-export function TileSelector({ isOpen, onClose, onSelect }: TileSelectorProps) {
+export const TileSelector = ({ isOpen, onClose, onSelect }: TileSelectorProps) => {
   if (!isOpen) return null;
 
   const tileSize = 48;
@@ -45,11 +45,13 @@ export function TileSelector({ isOpen, onClose, onSelect }: TileSelectorProps) {
                     onClose();
                   }}
                 >
-                  <div 
+                  <div
                     className="w-12 h-12 bg-cover"
                     style={{
                       backgroundImage: `url(https://i.imgur.com/FBvng3a.png)`,
                       backgroundPosition: `-${tile.x}px -${tile.y}px`,
+                      // pointerEvents: 'none'
+                      // draggable: false,
                     }}
                   />
                 </div>

@@ -1,4 +1,4 @@
-import { Cell } from '../../../../../../project/src/types';
+// import { MapCell } from '@/types/game';
 import { defaultMaps } from './defaultMaps.ts';
 
 // Load maps from localStorage or use defaults

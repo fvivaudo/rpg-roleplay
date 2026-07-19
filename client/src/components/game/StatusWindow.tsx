@@ -6,7 +6,7 @@ interface StatusWindowProps {
   position: { x: number; y: number };
 }
 
-export function StatusWindow({ isOpen, onClose, position }: StatusWindowProps) {
+export const StatusWindow = ({ isOpen, onClose, position }: StatusWindowProps) => {
   if (!isOpen) return null;
 
   return (

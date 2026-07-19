@@ -46,7 +46,7 @@ export const createRouter = (queryClient: QueryClient) =>
         {
           path: 'game',
           lazy: async () => {
-            const { GameRoute } = await import('./app/game');
+            const { GameRoute } = await import('./app/gameScreen.tsx');
             return { Component: GameRoute };
           },
         },

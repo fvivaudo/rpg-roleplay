@@ -3,18 +3,22 @@ import {Link, useNavigate, useSearchParams} from 'react-router';
 import {ArrowsOutCardinal} from "@phosphor-icons/react";
 import interact from 'interactjs'
 
-import logo from '@/assets/react.svg';
-import {Head} from '@/components/seo';
-import {Button} from '@/components/ui/button';
+// import logo from '@/assets/react.svg';
+// import {Head} from '@/components/seo';
+// import {Button} from '@/components/ui/button';
 import {useLogout, useUser} from '@/lib/auth.tsx';
 
-import {Layout} from '@/components/layouts/auth-layout.tsx';
-import {LoginForm} from '@/features/auth/components/login-form.tsx';
-import {RegisterForm} from "@/features/auth/components/register-form.tsx";
-import {ReactNode, useCallback, useEffect, useState} from "react";
+// import {Layout} from '@/components/layouts/auth-layout.tsx';
+// import {LoginForm} from '@/features/auth/components/login-form.tsx';
+// import {RegisterForm} from "@/features/auth/components/register-form.tsx";
+// import * as ex from 'excalibur';
+import {ReactNode, useCallback, useEffect, useRef, useState} from "react";
 import {Message, UserData} from "@/lib/api-client";
 import {useChat} from "@/hooks/use-chat";
-import * as ex from 'excalibur';
+import { Game } from './game';
+import {StatusWindow} from "@/components/game/StatusWindow.tsx";
+import {TileSelector} from "@/components/game/TileSelector.tsx";
+import {MapEditorScreen} from "@/components/game/MapEditorScreen.tsx";
 
 
 type WindowWrapperProps = {
@@ -174,6 +178,56 @@ const ChatWindow = ({history, userId, characterId, characterName}: {
 // game.start();
 
 export const GameRoute = () => {
+    const gameRef = useRef<Game | null>(null);
+    const [statusWindow, setStatusWindow] = useState({
+        isOpen: false,
+        position: { x: 0, y: 0 }
+    });
+    const [tileSelectorOpen, setTileSelectorOpen] = useState(false);
+    const [mapEditorOpen, setMapEditorOpen] = useState(false);
+
+    useEffect(() => {
+        if (!gameRef.current) {
+            gameRef.current = new Game();
+
+            // Subscribe to player click events
+            gameRef.current.onPlayerClick = (x: number, y: number) => {
+                setStatusWindow({
+                    isOpen: true,
+                    position: { x, y }
+                });
+            };
+
+            gameRef.current.start();
+        }
+
+        // Listen for tile selector events
+        // const handleTileSelectorOpen = () => {
+        //     setTileSelectorOpen(true);
+        // };
+        //
+        // window.addEventListener('setTileSelectorOpen', handleTileSelectorOpen);
+        //
+        // return () => {
+        //     window.removeEventListener('setTileSelectorOpen', handleTileSelectorOpen);
+        //     if (gameRef.current) {
+        //         gameRef.current = null;
+        //     }
+        // };
+    }, []);
+
+    const handleTileSelect = (type: 'floor' | 'wall', tileId: number) => {
+        if (gameRef.current) {
+            gameRef.current.setSelectedTile(type, tileId);
+        }
+    };
+
+    const handleMapSelect = (mapName: string) => {
+        if (gameRef.current) {
+            gameRef.current.loadMap(mapName);
+        }
+    };
+
     const navigate = useNavigate();
     const user = useUser();
     const logout = useLogout();
@@ -200,28 +254,77 @@ export const GameRoute = () => {
     // </Button>
 
 
+    // return (
+    //     <>
+    //         <div className="relative w-full h-screen no-scrollbar">
+    //             <canvas id={'game'} width={800} height={600} />
+    //             <div
+    //                 className={"-z-40 absolute w-full h-full bg-cover bg-[url('/game/background.webp')] brightness-75"}/>
+    //             {/*{UxElements.map(item) => {*/}
+    //             {/*    <ChatWindow/>*/}
+    //             {/*    <ChatWindow/>*/}
+    //             {/*}}*/}
+    //             <WindowWrapper objectId={'chatBox1'} className={'w-96 h-96 text-white flex flex-col'}>
+    //                 {/*TODO Differentiate between user and characters*/}
+    //                 <ChatWindow
+    //                     history={user.data.gameChatHistory}
+    //                     userId={user.data.id}
+    //                     characterId={user.data.id}
+    //                     characterName={user.data.name}/>
+    //             </WindowWrapper>
+    //             {/*<WindowWrapper objectId={'chatBox2'} className={'w-96 h-96 text-white flex flex-col'}>*/}
+    //             {/*    <ChatWindow/>*/}
+    //             {/*</WindowWrapper>*/}
+    //         </div>
+    //     </>
+    // );
+
     return (
-        <>
-            <div className="relative w-full h-screen no-scrollbar">
-                <canvas id={'game'} width={800} height={600} />
-                <div
-                    className={"-z-40 absolute w-full h-full bg-cover bg-[url('/game/background.webp')] brightness-75"}/>
-                {/*{UxElements.map(item) => {*/}
-                {/*    <ChatWindow/>*/}
-                {/*    <ChatWindow/>*/}
-                {/*}}*/}
-                <WindowWrapper objectId={'chatBox1'} className={'w-96 h-96 text-white flex flex-col'}>
-                    {/*TODO Differentiate between user and characters*/}
-                    <ChatWindow
-                        history={user.data.gameChatHistory}
-                        userId={user.data.id}
-                        characterId={user.data.id}
-                        characterName={user.data.name}/>
-                </WindowWrapper>
-                {/*<WindowWrapper objectId={'chatBox2'} className={'w-96 h-96 text-white flex flex-col'}>*/}
-                {/*    <ChatWindow/>*/}
-                {/*</WindowWrapper>*/}
+        <div className="relative">
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <div className="flex flex-col items-center gap-4">
+                    {/*<div className="bg-white p-4 rounded-lg shadow-md">*/}
+                    {/*    <h2 className="text-lg font-semibold mb-2">Controls</h2>*/}
+                    {/*    <ul className="space-y-1">*/}
+                    {/*        <li><kbd className="px-2 py-1 bg-gray-100 rounded">T</kbd> Toggle Tactical Mode</li>*/}
+                    {/*        <li><kbd className="px-2 py-1 bg-gray-100 rounded">E</kbd> Toggle Editor Mode</li>*/}
+                    {/*        <li><kbd className="px-2 py-1 bg-gray-100 rounded">N</kbd> Normal Mode</li>*/}
+                    {/*        <li><kbd className="px-2 py-1 bg-gray-100 rounded">V</kbd> Open Tile Selector</li>*/}
+                    {/*        <li><kbd className="px-2 py-1 bg-gray-100 rounded">M</kbd> Open Map Editor</li>*/}
+                    {/*    </ul>*/}
+                    {/*</div>*/}
+                    <button
+                        onClick={() => setMapEditorOpen(true)}
+                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    >
+                        Open Map Editor
+                    </button>
+                    <canvas id="game"></canvas>
+                </div>
             </div>
-        </>
+            <WindowWrapper objectId={'chatBox1'} className={'w-96 h-96 text-white flex flex-col'}>
+                {/*TODO Differentiate between user and characters*/}
+                <ChatWindow
+                    history={user.data.gameChatHistory}
+                    userId={user.data.id}
+                    characterId={user.data.id}
+                    characterName={user.data.name}/>
+            </WindowWrapper>
+            <StatusWindow
+                isOpen={statusWindow.isOpen}
+                position={statusWindow.position}
+                onClose={() => setStatusWindow(prev => ({ ...prev, isOpen: false }))}
+            />
+            <TileSelector
+                isOpen={tileSelectorOpen}
+                onClose={() => setTileSelectorOpen(false)}
+                onSelect={handleTileSelect}
+            />
+            <MapEditorScreen
+                isOpen={mapEditorOpen}
+                onClose={() => setMapEditorOpen(false)}
+                onMapSelect={handleMapSelect}
+            />
+        </div>
     );
 };
