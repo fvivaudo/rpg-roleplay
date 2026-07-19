@@ -1,7 +1,8 @@
 import { ImageSource } from 'excalibur';
 
-// Load tileset from URL
-export const tilesetImage = new ImageSource('https://i.imgur.com/FBvng3a.png');
+// Vendored locally (client/public/game/tileset.png) — previously hotlinked
+// from imgur. 768x576 atlas of 48x48 tiles (16 columns x 12 rows).
+export const tilesetImage = new ImageSource('/game/tileset.png');
 
 // Define tile categories and their positions (each tile is 48x48)
 export const TILES = {

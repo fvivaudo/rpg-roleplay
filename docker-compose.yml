@@ -1,0 +1,29 @@
+# Local Postgres for development and the Part XIV verification loop.
+# Bring up with `docker compose up -d`, then point the server's DATABASE_URL at
+# it and run `bun run --cwd server db:migrate` to create the schema.
+#
+#   DATABASE_URL=postgresql://rpg:rpg@localhost:5432/rpg
+#
+# The live deployment uses Neon; this compose file is only for local/CI.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rpg-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rpg
+      POSTGRES_PASSWORD: rpg
+      POSTGRES_DB: rpg
+    ports:
+      - "5432:5432"
+    volumes:
+      - rpg-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rpg -d rpg"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rpg-postgres-data:

@@ -1,5 +1,5 @@
 {
   "name": "rpg",
   "trustedDependencies": ["", "@parcel/watcher", "@prisma/client", "@prisma/engines", "@swc/core", "esbuild", "prisma"],
-  "workspaces": ["client", "server"]
+  "workspaces": ["client", "server", "packages/*"]
 }

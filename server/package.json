@@ -4,19 +4,25 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts",
-    "prisma:push": "bunx prisma db push"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@rpg/protocol": "workspace:*",
+    "@rpg/world": "workspace:*",
     "@elysiajs/cors": "^1.2.0",
     "@elysiajs/jwt": "^1.2.0",
     "@elysiajs/swagger": "^1.2.0",
-    "@prisma/client": "^5.22.0",
-    "elysia": "^1.2.10"
+    "drizzle-orm": "^0.45.2",
+    "elysia": "^1.2.10",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/bun": "^1.1.15",
     "bun-types": "latest",
-    "prisma": "^5.22.0"
+    "drizzle-kit": "^0.31.10"
   },
   "module": "src/index.js"
 }

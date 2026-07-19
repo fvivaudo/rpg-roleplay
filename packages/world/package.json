@@ -1,0 +1,22 @@
+{
+  "name": "@rpg/world",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rpg/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.15",
+    "typescript": "^5.7.3"
+  }
+}

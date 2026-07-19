@@ -4,11 +4,10 @@ import {z} from 'zod';
 
 import type {AuthResponse} from '@/types/api';
 import type {UserData} from "./api-client";
-import type {User} from '@prisma/client'
+import type {User} from '@rpg/protocol'
 
 import api from './api-client';
 import React from "react";
-import Cookies from 'js-cookie';
 
 // api call definitions for auth (types, schemas, requests):
 // these are not part of features as this is a module shared across features
@@ -24,7 +23,8 @@ const logoutFn = async (): Promise<{message: string}> => {
 
 export const loginInputSchema = z.object({
     email: z.string().min(1, 'Required').email('Invalid email'),
-    password: z.string().min(5, 'Required'),
+    // Matches the server's minLength: 8 so errors surface before the request
+    password: z.string().min(8, 'At least 8 characters'),
 });
 
 export type LoginInput = z.infer<typeof loginInputSchema>;
@@ -40,10 +40,9 @@ const loginFn = async (data: LoginInput):Promise<User> => {
 
 export const registerInputSchema = z
     .object({
-        email: z.string().min(1, 'Required'),
+        email: z.string().min(1, 'Required').email('Invalid email'),
         name: z.string().min(1, 'Required').max(20, 'Max 20 characters'),
-        // lastName: z.string().min(1, 'Required'),
-        password: z.string().min(1, 'Required'),
+        password: z.string().min(8, 'At least 8 characters'),
     })
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;
@@ -62,11 +61,10 @@ const registerFn = async (data: RegisterInput) => {
     return response.data.user;
 }
 
+// Auth cookies are httpOnly and set by the server on login/signup (the fetch
+// runs with credentials:'include'); the client never touches tokens itself.
 async function handleUserResponse(data: AuthResponse) {
-    const { refreshToken, accessToken, user } = data.data
-
-    Cookies.set('accessToken', accessToken, { expires: 7 })
-    Cookies.set('refreshToken', refreshToken, { expires: 7 })
+    const { user } = data.data
     return user
 }
 
@@ -90,9 +88,19 @@ export const { useUser, useLogin, useLogout, useRegister, AuthLoader} =
     });
 
 
+const AuthPending = () => (
+    <div className="flex h-screen items-center justify-center bg-[#07070d] text-xs uppercase tracking-[0.3em] text-slate-600">
+        Authenticating…
+    </div>
+);
+
 // If we're  connected, redirect to the game
 export const ConnectRedirectRoute = ({children}: { children: React.ReactNode }) => {
     const user = useUser();
+
+    if (user.isLoading) {
+        return <AuthPending />;
+    }
 
     if (user.data) {
         return (
@@ -106,15 +114,19 @@ export const ConnectRedirectRoute = ({children}: { children: React.ReactNode }) 
     return children;
 };
 
-// If we're not connected, redirect to the landing
+// If we're not connected, redirect to the landing. Waits for the /me query to
+// settle first so a full-page load of a deep link (e.g. /app/editor) doesn't
+// bounce through the landing redirect chain.
 export const ProtectedRoute = ({children}: { children: React.ReactNode }) => {
     const user = useUser();
-    // const location = useLocation();
+
+    if (user.isLoading) {
+        return <AuthPending />;
+    }
 
     if (!user.data) {
         return (
             <Navigate
-                // to={`/auth/login?redirectTo=${encodeURIComponent(location.pathname)}`}
                 to={`/`}
                 replace
             />

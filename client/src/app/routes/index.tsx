@@ -1,109 +1,87 @@
 import { QueryClient } from '@tanstack/react-query';
-import { createBrowserRouter } from 'react-router';
-import {ConnectRedirectRoute, ProtectedRoute, useUser} from "@/lib/auth.tsx";
+import { createBrowserRouter, Navigate } from 'react-router';
 
-// import { ProtectedRoute } from '@/lib/auth';
-//
-// import { discussionLoader } from './app/discussions/discussion';
-// import { discussionsLoader } from './app/discussions/discussions';
+import { ConnectRedirectRoute, ProtectedRoute } from '@/lib/auth.tsx';
+
 import { AppRoot } from './app/root';
-import {LandingRoute} from "@/app/routes/landing.tsx";
-// import { usersLoader } from './app/users';
+import { LandingRoute } from '@/app/routes/landing.tsx';
 
-export const createRouter = (queryClient: QueryClient) =>
-  createBrowserRouter([
-    {
-      path: '/',
+export const createRouter = (_queryClient: QueryClient) =>
+  createBrowserRouter(
+    [
+      {
+        path: '/',
         element: (
-            <ConnectRedirectRoute>
-                <LandingRoute />
-            </ConnectRedirectRoute>
+          <ConnectRedirectRoute>
+            <LandingRoute />
+          </ConnectRedirectRoute>
         ),
-    },
-
-    // {
-    //   path: '/auth/register',
-    //   lazy: async () => {
-    //     const { RegisterRoute } = await import('./auth/register');
-    //     return { Component: RegisterRoute };
-    //   },
-    // },
-    // {
-    //   path: '/auth/login',
-    //   lazy: async () => {
-    //     const { LoginRoute } = await import('./auth/login');
-    //     return { Component: LoginRoute };
-    //   },
-    // },
-    {
-      path: '/app',
-      element: (
-        <ProtectedRoute>
-          <AppRoot />
-        </ProtectedRoute>
-      ),
-      children: [
-        {
-          path: 'game',
-          lazy: async () => {
-            const { GameRoute } = await import('./app/gameScreen.tsx');
-            return { Component: GameRoute };
+      },
+      {
+        path: '/app',
+        element: (
+          <ProtectedRoute>
+            <AppRoot />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <Navigate to="game" replace /> },
+          {
+            path: 'game',
+            lazy: async () => {
+              const { GameRoute } = await import('./app/game');
+              return { Component: GameRoute };
+            },
           },
+          {
+            path: 'characters',
+            lazy: async () => {
+              const { CharactersRoute } = await import('./app/characters');
+              return { Component: CharactersRoute };
+            },
+          },
+          {
+            path: 'editor',
+            lazy: async () => {
+              const { EditorRoute } = await import('./app/editor');
+              return { Component: EditorRoute };
+            },
+          },
+          {
+            path: 'forum',
+            lazy: async () => {
+              const { ForumRoute } = await import('./app/forum/forum');
+              return { Component: ForumRoute };
+            },
+          },
+          {
+            path: 'forum/:categoryId',
+            lazy: async () => {
+              const { ForumCategoryRoute } = await import('./app/forum/category');
+              return { Component: ForumCategoryRoute };
+            },
+          },
+          {
+            path: 'forum/thread/:threadId',
+            lazy: async () => {
+              const { ForumThreadRoute } = await import('./app/forum/thread');
+              return { Component: ForumThreadRoute };
+            },
+          },
+        ],
+      },
+      {
+        path: '*',
+        lazy: async () => {
+          const { NotFoundRoute } = await import('./not-found');
+          return { Component: NotFoundRoute };
         },
-        // {
-        //   path: 'discussions',
-        //   lazy: async () => {
-        //     const { DiscussionsRoute } = await import(
-        //       './app/discussions/discussions'
-        //     );
-        //     return { Component: DiscussionsRoute };
-        //   },
-        //   loader: discussionsLoader(queryClient),
-        // },
-        // {
-        //   path: 'discussions/:discussionId',
-        //   lazy: async () => {
-        //     const { DiscussionRoute } = await import(
-        //       './app/discussions/discussion'
-        //     );
-        //     return { Component: DiscussionRoute };
-        //   },
-        //   loader: discussionLoader(queryClient),
-        // },
-        // {
-        //   path: 'users',
-        //   lazy: async () => {
-        //     const { UsersRoute } = await import('./app/users');
-        //     return { Component: UsersRoute };
-        //   },
-        //   loader: usersLoader(queryClient),
-        // },
-        // {
-        //   path: 'profile',
-        //   lazy: async () => {
-        //     const { ProfileRoute } = await import('./app/profile');
-        //     return { Component: ProfileRoute };
-        //   },
-        // },
-        // {
-        //   path: '',
-        //   lazy: async () => {
-        //     const { DashboardRoute } = await import('./app/dashboard');
-        //     return { Component: DashboardRoute };
-        //   },
-        // },
-      ],
-    },
+      },
+    ],
     {
-      path: '*',
-      lazy: async () => {
-        const { NotFoundRoute } = await import('./not-found');
-        return { Component: NotFoundRoute };
+      future: {
+        v7_fetcherPersist: true,
+        v7_normalizeFormMethod: true,
       },
     },
-  ], {
-      future: {
-          v7_fetcherPersist: true,
-          v7_normalizeFormMethod: true,
-      },
-  });
+  );

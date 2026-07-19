@@ -1,206 +1,69 @@
-import { Home, PanelLeft, Gamepad2, Users, User2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { NavLink, useNavigate, useNavigation } from 'react-router';
+import { NavLink } from 'react-router';
 
-import logo from '@/assets/logo.svg';
-import { Button } from '@/components/ui/button';
-import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
-import { useLogout } from '@/lib/auth';
-// import { ROLES, useAuthorization } from '@/lib/authorization';
+import { useLogout, useUser } from '@/lib/auth';
 import { cn } from '@/utils/cn';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown';
-import { Link } from '../ui/link';
+const NAVIGATION = [
+  { name: 'Game', to: '/app/game' },
+  { name: 'Characters', to: '/app/characters' },
+  { name: 'Editor', to: '/app/editor' },
+  { name: 'Forum', to: '/app/forum' },
+];
 
-type SideNavigationItem = {
-  name: string;
-  to: string;
-  icon: (props: React.SVGProps<SVGSVGElement>) => JSX.Element;
-};
-
-const Logo = () => {
-  return (
-    <Link className="flex items-center text-white" to="/">
-      <img className="h-8 w-auto" src={logo} alt="Workflow" />
-      <span className="text-sm font-semibold text-white">
-        Bulletproof React
-      </span>
-    </Link>
-  );
-};
-
-const Progress = () => {
-  const { state, location } = useNavigation();
-
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    setProgress(0);
-  }, [location?.pathname]);
-
-  useEffect(() => {
-    if (state === 'loading') {
-      const timer = setInterval(() => {
-        setProgress((oldProgress) => {
-          if (oldProgress === 100) {
-            clearInterval(timer);
-            return 100;
-          }
-          const newProgress = oldProgress + 10;
-          return newProgress > 100 ? 100 : newProgress;
-        });
-      }, 300);
-
-      return () => {
-        clearInterval(timer);
-      };
-    }
-  }, [state]);
-
-  if (state !== 'loading') {
-    return null;
-  }
-
-  return (
-    <div
-      className="fixed left-0 top-0 h-1 bg-blue-500 transition-all duration-200 ease-in-out"
-      style={{ width: `${progress}%` }}
-    ></div>
-  );
-};
-
+/**
+ * App shell: a slim neon top bar over a full-height content area. The game
+ * canvas and editor grid own their scroll; the bar never does.
+ */
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const logout = useLogout();
-  // const { checkAccess } = useAuthorization();
-  const navigate = useNavigate();
-  const navigation = [
-    { name: 'Game', to: './game', icon: Gamepad2 },
-    { name: 'Dashboard', to: '.', icon: Home },
-    // checkAccess({ allowedRoles: [ROLES.ADMIN] }) && {
-    //   name: 'Users',
-    //   to: './users',
-    //   icon: Users,
-    // },
-  ].filter(Boolean) as SideNavigationItem[];
+  const user = useUser();
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <aside className="fixed inset-y-0 left-0 z-10 hidden w-60 flex-col border-r bg-black sm:flex">
-        <nav className="flex flex-col items-center gap-4 px-2 py-4">
-          <div className="flex h-16 shrink-0 items-center px-4">
-            <Logo />
-          </div>
-          {navigation.map((item) => (
+    <div className="flex h-screen flex-col bg-[#07070d] text-slate-200">
+      <header className="flex h-12 shrink-0 items-center gap-6 border-b border-cyan-900/50 bg-[#0b0b14] px-4">
+        <NavLink
+          to="/app/game"
+          className="text-sm font-black uppercase tracking-[0.35em] text-cyan-300"
+          style={{ textShadow: '0 0 12px rgba(34,211,238,0.5)' }}
+        >
+          Nekron
+        </NavLink>
+
+        <nav className="flex items-center gap-1">
+          {NAVIGATION.map((item) => (
             <NavLink
               key={item.name}
               to={item.to}
-              end={item.name !== 'Discussions'}
               className={({ isActive }) =>
                 cn(
-                  'text-gray-300 hover:bg-gray-700 hover:text-white',
-                  'group flex flex-1 w-full items-center rounded-md p-2 text-base font-medium',
-                  isActive && 'bg-gray-900 text-white',
+                  'px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] transition-colors',
+                  isActive
+                    ? 'bg-cyan-950/50 text-cyan-300'
+                    : 'text-slate-500 hover:text-slate-200',
                 )
               }
             >
-              <item.icon
-                className={cn(
-                  'text-gray-400 group-hover:text-gray-300',
-                  'mr-4 size-6 shrink-0',
-                )}
-                aria-hidden="true"
-              />
               {item.name}
             </NavLink>
           ))}
-          <Button disabled={logout.isLoading} onClick={() => logout.mutate({})}>
-            Log out
-          </Button>
         </nav>
-      </aside>
-      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-60">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:justify-end sm:border-0 sm:bg-transparent sm:px-6">
-          <Progress />
-          <Drawer>
-            <DrawerTrigger asChild>
-              <Button size="icon" variant="outline" className="sm:hidden">
-                <PanelLeft className="size-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </DrawerTrigger>
-            <DrawerContent
-              side="left"
-              className="bg-black pt-10 text-white sm:max-w-60"
-            >
-              <nav className="grid gap-6 text-lg font-medium">
-                <div className="flex h-16 shrink-0 items-center px-4">
-                  <Logo />
-                </div>
-                {navigation.map((item) => (
-                  <NavLink
-                    key={item.name}
-                    to={item.to}
-                    end
-                    className={({ isActive }) =>
-                      cn(
-                        'text-gray-300 hover:bg-gray-700 hover:text-white',
-                        'group flex flex-1 w-full items-center rounded-md p-2 text-base font-medium',
-                        isActive && 'bg-gray-900 text-white',
-                      )
-                    }
-                  >
-                    <item.icon
-                      className={cn(
-                        'text-gray-400 group-hover:text-gray-300',
-                        'mr-4 size-6 shrink-0',
-                      )}
-                      aria-hidden="true"
-                    />
-                    {item.name}
-                  </NavLink>
-                ))}
-              </nav>
-            </DrawerContent>
-          </Drawer>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="overflow-hidden rounded-full"
-              >
-                <span className="sr-only">Open user menu</span>
-                <User2 className="size-6 rounded-full" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => navigate('./profile')}
-                className={cn('block px-4 py-2 text-sm text-gray-700')}
-              >
-                Your Profile
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className={cn('block px-4 py-2 text-sm text-gray-700 w-full')}
-                onClick={() => logout.mutate({})}
-              >
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </header>
-        {/*<main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">*/}
-          <main>
-          {children}
-        </main>
-      </div>
+
+        <div className="ml-auto flex items-center gap-4">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
+            {user.data?.name}
+          </span>
+          <button
+            type="button"
+            disabled={logout.isPending}
+            onClick={() => logout.mutate({})}
+            className="border border-slate-700 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400 transition-colors hover:border-rose-700 hover:text-rose-300 disabled:opacity-50"
+          >
+            Jack out
+          </button>
+        </div>
+      </header>
+
+      <main className="min-h-0 flex-1">{children}</main>
     </div>
   );
 }

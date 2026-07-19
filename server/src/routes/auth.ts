@@ -1,15 +1,24 @@
 import { Elysia } from "elysia";
-import { loginBodySchema, signupBodySchema } from "./schema";
-import { prisma } from "./lib";
+import { desc, eq } from "drizzle-orm";
+import { loginBodySchema, signupBodySchema } from "../schema";
+import { db, schema } from "../lib";
 import { jwt } from "@elysiajs/jwt";
 import {
     ACCESS_TOKEN_EXP,
     JWT_NAME,
     REFRESH_TOKEN_EXP,
-} from "./config/constants";
-import { getExpTimestamp } from "./lib";
-import { authPlugin } from "./plugin";
+} from "../config/constants";
+import { getExpTimestamp } from "../lib";
+import { authPlugin } from "../plugin";
 
+// Tokens ride httpOnly cookies only; user payloads never include the
+// password hash or the stored refresh token.
+function toPublicUser<T extends { password?: unknown; refreshToken?: unknown }>(
+    user: T
+) {
+    const { password, refreshToken, ...publicUser } = user;
+    return publicUser;
+}
 
 export const authRoutes = new Elysia({ prefix: "/auth" })
     .get('/', () => 'Hi Elysia')
@@ -23,17 +32,16 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         "/login",
         async ({ body, jwt, cookie: { accessToken, refreshToken }, set }) => {
             // match user email
-            const user = await prisma.user.findUnique({
-                where: { email: body.email },
-                select: {
-                    id: true,
-                    name:true,
-                    email: true,
-                    password: true,
-                },
-            });
-
-
+            const [user] = await db
+                .select({
+                    id: schema.users.id,
+                    name: schema.users.name,
+                    email: schema.users.email,
+                    password: schema.users.password,
+                })
+                .from(schema.users)
+                .where(eq(schema.users.email, body.email))
+                .limit(1);
 
             if (!user) {
                 set.status = "Bad Request";
@@ -81,24 +89,21 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
             });
 
             // set user profile as online
-            const updatedUser = await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
+            const [updatedUser] = await db
+                .update(schema.users)
+                .set({
                     isOnline: true,
                     refreshToken: refreshJWTToken,
-                },
-            });
+                })
+                .where(eq(schema.users.id, user.id))
+                .returning();
             console.log(
                 `${user.name} logged in`
             );
             return {
                 message: "Sig-in successfully",
                 data: {
-                    user: updatedUser,
-                    accessToken: accessJWTToken,
-                    refreshToken: refreshJWTToken,
+                    user: toPublicUser(updatedUser),
                 },
             };
         },
@@ -109,19 +114,69 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     // TODO add email validation
     .post(
         "/signup",
-        async ({ body }) => {
+        async ({ body, jwt, cookie: { accessToken, refreshToken }, error }) => {
             // hash password
             const password = await Bun.password.hash(body.password, {
                 algorithm: "bcrypt",
                 cost: 10,
             });
 
-            const user = await prisma.user.create({
-                data: {
-                    ...body,
-                    password,
-                },
+            let user;
+            try {
+                [user] = await db
+                    .insert(schema.users)
+                    .values({
+                        ...body,
+                        password,
+                    })
+                    .returning();
+            } catch (e) {
+                // 23505 = Postgres unique_violation (duplicate email). Drizzle
+                // wraps driver errors, so the SQLSTATE may sit on `.cause`.
+                const code =
+                    (e as { code?: string }).code ??
+                    (e as { cause?: { code?: string } }).cause?.code;
+                if (code === "23505") {
+                    // Return via the status helper so eden treats it as an error
+                    // response, keeping the success `data` type clean.
+                    return error(409, {
+                        name: "Error",
+                        message: `The email address provided ${body.email} already exists`,
+                    });
+                }
+                throw e;
+            }
+
+            // Signup logs the account straight in (same cookie pair as
+            // /login) so the client lands in the app fully authenticated —
+            // the client caches the returned user as the session user.
+            const accessJWTToken = await jwt.sign({
+                sub: user.id,
+                exp: getExpTimestamp(ACCESS_TOKEN_EXP),
             });
+            accessToken.set({
+                value: accessJWTToken,
+                httpOnly: true,
+                maxAge: ACCESS_TOKEN_EXP,
+                path: "/",
+            });
+            const refreshJWTToken = await jwt.sign({
+                sub: user.id,
+                exp: getExpTimestamp(REFRESH_TOKEN_EXP),
+            });
+            refreshToken.set({
+                value: refreshJWTToken,
+                httpOnly: true,
+                maxAge: REFRESH_TOKEN_EXP,
+                path: "/",
+            });
+
+            const [loggedInUser] = await db
+                .update(schema.users)
+                .set({ isOnline: true, refreshToken: refreshJWTToken })
+                .where(eq(schema.users.id, user.id))
+                .returning();
+
             console.log(
                 `${user.name} account with email ${user.email} created`
             );
@@ -129,23 +184,12 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
             return {
                 message: "Account created successfully",
                 data: {
-                    user,
+                    user: toPublicUser(loggedInUser),
                 },
             };
         },
         {
             body: signupBodySchema,
-            error({ code, set, body }) {
-                // handle duplicate email error throw by prisma
-                // P2002 duplicate field error code
-                if ((code as unknown) === "P2002") {
-                    set.status = "Conflict";
-                    return {
-                        name: "Error",
-                        message: `The email address provided ${body.email} already exists`,
-                    };
-                }
-            },
         }
     )
     .post(
@@ -167,14 +211,14 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
             }
 
             // get user from refresh token
-            const userId = jwtPayload.sub;
+            const userId = jwtPayload.sub as string;
 
             // verify user exists or not
-            const user = await prisma.user.findUnique({
-                where: {
-                    id: userId,
-                },
-            });
+            const [user] = await db
+                .select()
+                .from(schema.users)
+                .where(eq(schema.users.id, userId))
+                .limit(1);
 
             if (!user) {
                 // handle error for user not found from the provided refresh token
@@ -207,21 +251,13 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
             });
 
             // set refresh token in db
-            await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
-                    refreshToken: refreshJWTToken,
-                },
-            });
+            await db
+                .update(schema.users)
+                .set({ refreshToken: refreshJWTToken })
+                .where(eq(schema.users.id, user.id));
 
             return {
                 message: "Access token generated successfully",
-                data: {
-                    accessToken: accessJWTToken,
-                    refreshToken: refreshJWTToken,
-                },
             };
         }
     )
@@ -233,15 +269,13 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         refreshToken.remove();
 
         // remove refresh token from db & set user online status to offline
-        await prisma.user.update({
-            where: {
-                id: user.id,
-            },
-            data: {
+        await db
+            .update(schema.users)
+            .set({
                 isOnline: false,
                 refreshToken: null,
-            },
-        });
+            })
+            .where(eq(schema.users.id, user.id));
         console.log(
             `${user.name} logout`
         );
@@ -252,19 +286,18 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     .use(authPlugin)
     .get("/me", async ({ user }) => {
         // It's a waste to do two requests with the plugin already fetching user, but couldn't find better at the moment
-        const extraDataUser = await prisma.user.findUnique({
-            where: {
-                id: user.id,
-            },
-            include: {
+        const extraDataUser = await db.query.users.findFirst({
+            where: eq(schema.users.id, user.id),
+            columns: { password: false, refreshToken: false },
+            with: {
                 gameChatHistory: {
-                    select: {
+                    columns: {
                         id: true,
                         createdAt: true,
                         characterName: true,
                         content: true,
-                        // characterId: true,
                     },
+                    orderBy: desc(schema.chatMessages.createdAt),
                 },
             },
         });
@@ -274,7 +307,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return {
             message: "Fetch current user",
             data: {
-                user:extraDataUser,
+                user: extraDataUser ?? null,
             },
         };
     });

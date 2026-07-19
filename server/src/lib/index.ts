@@ -1,2 +1,2 @@
 export { getExpTimestamp } from './util'
-export { prisma } from './prisma'
+export { db, schema } from '../db'
